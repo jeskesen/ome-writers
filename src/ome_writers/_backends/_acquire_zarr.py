@@ -93,22 +93,27 @@ class AcquireZarrBackend(YaozarrsBackend):
             storage_dim_order = [d.name for d in settings.array_storage_dimensions]
 
         compression_settings = self._resolve_compression(settings.compression)
-        self._stream = az.ZarrStream(
-            az.StreamSettings(
-                arrays=[
-                    az.ArraySettings(
-                        output_key=key,
-                        dimensions=az_dims,
-                        data_type=settings.dtype,
-                        compression=compression_settings,
-                        storage_dimension_order=storage_dim_order,
-                    )
-                    for key in self._az_pos_keys
-                ],
-                store_path=str(self._root),
-                version=az.ZarrVersion.V3,
-            )
+        stream_settings = az.StreamSettings(
+            arrays=[
+                az.ArraySettings(
+                    output_key=key,
+                    dimensions=az_dims,
+                    data_type=settings.dtype,
+                    compression=compression_settings,
+                    storage_dimension_order=storage_dim_order,
+                )
+                for key in self._az_pos_keys
+            ],
+            store_path=str(self._root),
+            version=az.ZarrVersion.V3,
         )
+        # Cap the internal compression/writer thread pool when the OME-Zarr
+        # format requested it. Left at acquire-zarr's default (one thread per
+        # CPU core) when unset.
+        max_threads = getattr(settings.format, "max_threads", None)
+        if max_threads is not None:
+            stream_settings.max_threads = max_threads
+        self._stream = az.ZarrStream(stream_settings)
 
     def write(
         self,

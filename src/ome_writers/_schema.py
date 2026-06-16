@@ -761,6 +761,16 @@ class OmeZarrFormat(_BaseModel):
         description="Directory suffix/extension to use for OME-Zarr directories. "
         "Default is '.ome.zarr'.",
     )
+    max_threads: int | None = Field(
+        default=None,
+        gt=0,
+        description="Maximum number of worker threads the backend may use for "
+        "compression and writing. Currently honored only by the 'acquire-zarr' "
+        "backend, where it caps the internal thread pool (`az.StreamSettings."
+        "max_threads`). If None (the default), the backend chooses its own default "
+        "(acquire-zarr uses one thread per CPU core). Lower this to keep the writer "
+        "pool from starving other CPU-bound work, such as camera acquisition threads.",
+    )
 
     def get_output_path(self, root_path: str, *, num_positions: int = 1) -> str:
         """Compute output path based on root_path.
