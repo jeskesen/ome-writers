@@ -761,6 +761,28 @@ class OmeZarrFormat(_BaseModel):
         description="Directory suffix/extension to use for OME-Zarr directories. "
         "Default is '.ome.zarr'.",
     )
+    max_inflight_writes: int | None = Field(
+        default=None,
+        gt=0,
+        description="Maximum number of outstanding (not-yet-committed) async write "
+        "futures the backend may retain before applying backpressure. Currently "
+        "honored only by the 'tensorstore' backend, whose `array[index].write()` is "
+        "asynchronous: each pending future pins its source frame in RAM until the "
+        "write commits, so an unbounded queue grows worker memory linearly with "
+        "frames written even when storage is keeping up. When the in-flight count "
+        "exceeds this cap, the oldest future is drained (blocked on) before the next "
+        "write is enqueued, converting unbounded growth into producer backpressure. "
+        "If None (the default), the backend chooses its own default. Other backends "
+        "ignore this field.",
+    )
+    max_threads: int | None = Field(
+        default=None,
+        gt=0,
+        description="Maximum number of worker threads the backend may use for "
+        "compression and writing. Currently not honored by any backend (kept for "
+        "forward compatibility and for callers that set it). If None (the default), "
+        "each backend chooses its own default (typically one thread per CPU core).",
+    )
 
     def get_output_path(self, root_path: str, *, num_positions: int = 1) -> str:
         """Compute output path based on root_path.
