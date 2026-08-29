@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import warnings
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import acquire_zarr as az
@@ -93,22 +94,37 @@ class AcquireZarrBackend(YaozarrsBackend):
             storage_dim_order = [d.name for d in settings.array_storage_dimensions]
 
         compression_settings = self._resolve_compression(settings.compression)
-        self._stream = az.ZarrStream(
-            az.StreamSettings(
-                arrays=[
-                    az.ArraySettings(
-                        output_key=key,
-                        dimensions=az_dims,
-                        data_type=settings.dtype,
-                        compression=compression_settings,
-                        storage_dimension_order=storage_dim_order,
-                    )
-                    for key in self._az_pos_keys
-                ],
-                store_path=str(self._root),
-                version=az.ZarrVersion.V3,
-            )
-        )
+        stream_kwargs: dict[str, Any] = {
+            "arrays": [
+                az.ArraySettings(
+                    output_key=key,
+                    dimensions=az_dims,
+                    data_type=settings.dtype,
+                    compression=compression_settings,
+                    storage_dimension_order=storage_dim_order,
+                )
+                for key in self._az_pos_keys
+            ],
+            "store_path": str(self._root),
+            "version": az.ZarrVersion.V3,
+        }
+        # direct_io landed in acquire-zarr after 0.8.1, so pass it only when the
+        # installed build accepts it. Requesting it against an older wheel is a
+        # warning rather than a TypeError -- silently writing through the page
+        # cache is the wrong failure for a caller who asked to bypass it, but so
+        # is refusing to write at all.
+        if settings.direct_io:
+            if hasattr(az.StreamSettings(), "direct_io"):
+                stream_kwargs["direct_io"] = True
+            else:
+                warnings.warn(
+                    "direct_io was requested but this acquire-zarr build does "
+                    f"not support it (version {getattr(az, '__version__', '?')}); "
+                    "writing through the page cache instead.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+        self._stream = az.ZarrStream(az.StreamSettings(**stream_kwargs))
 
     def write(
         self,

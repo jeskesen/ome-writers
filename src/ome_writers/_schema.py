@@ -988,6 +988,18 @@ class AcquisitionSettings(_BaseModel):
         "TIFF backend supports: 'lzw', 'none'. "
         "If None, no compression is applied.",
     )
+    direct_io: bool = Field(
+        default=False,
+        description="Bypass the OS page cache when writing (O_DIRECT / "
+        "FILE_FLAG_NO_BUFFERING). A streaming writer never reads back what it "
+        "wrote, so its page-cache residency is pure cost, and on a sustained "
+        "multi-TB write it can exhaust the host's high-order free lists and "
+        "starve unrelated kernel-context allocations. Only valid on a "
+        "filesystem that accepts unaligned direct writes: NFS does, while a "
+        "block-backed filesystem rejects them with EINVAL, because shards pack "
+        "variable-length compressed chunks at unaligned offsets. Currently "
+        "honored only by the 'acquire-zarr' backend; others ignore it.",
+    )
     storage_order: Literal["acquisition", "ome"] | list[str] = Field(
         default="ome",
         description="Storage order for non-frame dimensions (if different from "
